@@ -6,6 +6,15 @@ import numpy as np
 # statsmodels는 regplot이 내부적으로 처리하므로, 여기서는 직접 사용하지 않아도 됩니다.
 # import statsmodels.api as sm 
 
+# --- 한글 폰트 설정 시작 ---
+# Matplotlib에 한글 폰트 설정
+# 시스템에 'Malgun Gothic' 폰트가 있다고 가정합니다.
+# 다른 폰트가 필요하면 해당 폰트 이름으로 변경하거나, 폰트 파일을 직접 포함해야 할 수 있습니다.
+plt.rcParams['font.family'] = 'Malgun Gothic'
+# 마이너스 기호가 깨지는 것을 방지
+plt.rcParams['axes.unicode_minus'] = False
+# --- 한글 폰트 설정 끝 ---
+
 # CSV 파일 불러오기 (CP949 인코딩)
 # 'stress_sj.csv' 파일이 앱이 실행되는 디렉토리에 있어야 합니다.
 try:
