@@ -3,14 +3,33 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.font_manager as fm # 폰트 관리를 위한 모듈 임포트
+
 # statsmodels는 regplot이 내부적으로 처리하므로, 여기서는 직접 사용하지 않아도 됩니다.
 # import statsmodels.api as sm 
 
 # --- 한글 폰트 설정 시작 ---
-# Matplotlib에 한글 폰트 설정
-# 시스템에 'Malgun Gothic' 폰트가 있다고 가정합니다.
-# 다른 폰트가 필요하면 해당 폰트 이름으로 변경하거나, 폰트 파일을 직접 포함해야 할 수 있습니다.
-plt.rcParams['font.family'] = 'Malgun Gothic'
+# 시스템에 설치된 한글 폰트를 찾아 설정합니다.
+# 'NanumGothic'을 먼저 시도하고, 없으면 다른 일반 폰트를 시도합니다.
+font_path = None
+for font in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
+    if 'NanumGothic' in font: # 나눔고딕이 있다면 사용
+        font_path = font
+        break
+    elif 'Malgun Gothic' in font: # 말그은고딕이 있다면 사용
+        font_path = font
+        break
+
+if font_path:
+    font_name = fm.FontProperties(fname=font_path).get_name()
+    plt.rcParams['font.family'] = font_name
+    st.info(f"Matplotlib 폰트: '{font_name}'으로 설정되었습니다.")
+else:
+    # 시스템에 적절한 한글 폰트가 없을 경우, 기본 'sans-serif' 사용 및 안내 메시지
+    plt.rcParams['font.family'] = 'sans-serif'
+    st.warning("경고: 시스템에 한글 폰트(나눔고딕, 말그은고딕 등)가 설치되어 있지 않습니다. 기본 폰트로 표시됩니다.")
+    st.warning("한글이 깨져 보일 경우, Streamlit 클라우드 배포 환경에서 폰트 설치가 필요할 수 있습니다. (예: apt.txt 파일에 'fonts-nanum' 추가)")
+
 # 마이너스 기호가 깨지는 것을 방지
 plt.rcParams['axes.unicode_minus'] = False
 # --- 한글 폰트 설정 끝 ---
