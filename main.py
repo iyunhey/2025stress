@@ -16,43 +16,49 @@ try:
     fm._load_fontmanager(try_read_cache=False) # 캐시를 읽지 않고 다시 로드하도록 강제
     st.info("Matplotlib 폰트 매니저 캐시를 새로고침했습니다.")
 except Exception as e:
+    # 캐시 새로고침 중 오류가 발생할 경우 경고 메시지를 표시합니다.
+    # 이 오류는 Matplotlib 버전이 오래되었을 때 발생할 수 있습니다.
     st.warning(f"Matplotlib 폰트 매니저 새로고침 중 오류 발생: {e}. 사용 중인 Matplotlib 버전이 낮을 수 있습니다.")
 
-# Streamlit Cloud (Ubuntu 기반)에서 fonts-nanum 패키지 설치 시
-# 나눔고딕 폰트 파일의 일반적인 경로를 가정하고 직접 로드합니다.
-# 이 경로는 apt install fonts-nanum 실행 시 폰트 파일이 저장되는 표준 위치입니다.
-nanum_gothic_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+# 시스템에 설치된 한글 폰트(나눔고딕 계열)를 찾아 설정합니다.
+font_name = None
+# 시스템의 모든 폰트 경로를 가져와 나눔고딕 폰트 파일을 찾습니다.
+# 'NanumGothic'이라는 이름이 포함된 폰트 파일을 우선적으로 찾습니다.
+found_nanum_font_path = None
+for font_path_in_system in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
+    if 'nanumgothic' in os.path.basename(font_path_in_system).lower():
+        found_nanum_font_path = font_path_in_system
+        break
+    # 혹은 다른 나눔 폰트가 설치되어 있다면 다음처럼 추가 탐색할 수 있습니다.
+    # elif 'nanumbarungothic' in os.path.basename(font_path_in_system).lower():
+    #     found_nanum_font_path = font_path_in_system
+    #     break
 
-# 폰트 파일 존재 여부 확인
-if os.path.exists(nanum_gothic_path):
+if found_nanum_font_path:
     try:
         # 폰트 매니저에 폰트 파일을 직접 추가합니다.
-        # 이 단계는 Matplotlib이 자동으로 폰트를 찾지 못할 때 강제로 등록하는 역할을 합니다.
-        fm.fontManager.addfont(nanum_gothic_path)
+        fm.fontManager.addfont(found_nanum_font_path)
         
         # 추가된 폰트의 실제 내부 이름(메타데이터)을 가져옵니다.
-        # 이 이름이 'NanumGothic'일 수도 있고, 다른 이름일 수도 있습니다.
-        prop = fm.FontProperties(fname=nanum_gothic_path)
+        prop = fm.FontProperties(fname=found_nanum_font_path)
         font_name_from_file = prop.get_name()
 
         # Matplotlib의 기본 폰트 패밀리를 이 폰트 이름으로 설정합니다.
         plt.rcParams['font.family'] = font_name_from_file
         
         # sans-serif 폰트 목록의 가장 앞에 추가하여 한글 폰트가 영문 폰트보다 우선적으로 사용되도록 합니다.
-        # 이렇게 하면 한글이 있는 부분은 나눔고딕, 없는 부분은 다음 sans-serif 폰트를 사용합니다.
-        plt.rcParams['font.sans-serif'] = [font_name_from_file, 'DejaVu Sans', 'sans-serif'] 
+        plt.rcParams['font.sans-serif'] = [font_name_from_file] + plt.rcParams['font.sans-serif'] 
         
         st.success(f"한글 폰트 '{font_name_from_file}'이(가) 성공적으로 설정되었습니다.")
     except Exception as e:
-        # 폰트 파일은 있지만 설정 과정에서 오류가 발생한 경우
+        # 폰트 파일은 찾았지만 설정 과정에서 오류가 발생한 경우
         st.error(f"한글 폰트 설정 중 예기치 않은 오류 발생: {e}")
         plt.rcParams['font.family'] = 'sans-serif' # 오류 시 기본 폰트
 else:
-    # 폰트 파일 경로에 폰트가 없을 경우 경고 메시지를 표시합니다.
-    # 이는 apt.txt 설정이 잘못되었거나 fonts-nanum 설치에 실패했을 가능성이 큽니다.
+    # 나눔고딕 폰트를 찾지 못했을 경우 경고 메시지를 표시합니다.
     plt.rcParams['font.family'] = 'sans-serif'
-    st.warning("경고: 시스템에 'NanumGothic.ttf' 폰트 파일이 지정된 경로에서 발견되지 않았습니다. 기본 폰트('sans-serif')로 표시됩니다.")
-    st.warning("한글이 깨져 보일 경우, Streamlit 클라우드 배포 환경에서 `apt.txt`에 'fonts-nanum'이 올바르게 추가되었는지 확인하고 앱을 재배포해 주세요.")
+    st.warning("경고: 시스템에 한글 폰트(나눔고딕 계열)를 찾을 수 없습니다. 기본 폰트('sans-serif')로 표시됩니다.")
+    st.warning("한글이 깨져 보일 경우, Streamlit 클라우드 배포 환경에서 `apt.txt`에 'fonts-nanum'이 올바르게 추가되었는지 확인하고 앱을 재배포해 주세요. (가장 최신 코드로 업데이트 필요)")
 
 # 마이너스 기호가 깨지는 것을 방지합니다.
 plt.rcParams['axes.unicode_minus'] = False
