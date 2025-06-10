@@ -4,33 +4,63 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.font_manager as fm # 폰트 관리를 위한 모듈 임포트
+import os # 폰트 캐시 삭제를 위해 os 모듈 임포트
 
 # statsmodels는 regplot이 내부적으로 처리하므로, 여기서는 직접 사용하지 않아도 됩니다.
 # import statsmodels.api as sm 
 
 # --- 한글 폰트 설정 시작 ---
-# 시스템에 설치된 한글 폰트를 찾아 설정합니다.
-# 'NanumGothic'을 먼저 시도하고, 없으면 다른 일반 폰트를 시도합니다.
-font_path = None
-for font in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
-    if 'NanumGothic' in font: # 나눔고딕이 있다면 사용
-        font_path = font
-        break
-    elif 'Malgun Gothic' in font: # 말그은고딕이 있다면 사용
-        font_path = font
-        break
+# 폰트 캐시 삭제 (Streamlit Cloud 환경에서 폰트 변경 사항을 적용하기 위해 필요)
+# 이 방법은 폰트 설치 후 Matplotlib이 새 폰트를 인식하지 못할 때 유용합니다.
+try:
+    # Matplotlib 폰트 캐시 파일 경로 얻기
+    cache_dir = fm.get_cachedir()
+    for f in os.listdir(cache_dir):
+        if f.startswith('fontlist-'):
+            os.remove(os.path.join(cache_dir, f))
+            st.info(f"Matplotlib 폰트 캐시 파일 '{f}'를 삭제했습니다.")
+    # 폰트 캐시 재생성 강제
+    fm._load_fontmanager(try_read_cache=False) # 캐시를 읽지 않고 다시 로드하도록 강제
+except Exception as e:
+    st.warning(f"Matplotlib 폰트 캐시 삭제 중 오류 발생: {e}")
 
-if font_path:
-    font_name = fm.FontProperties(fname=font_path).get_name()
+# 시스템에 설치된 나눔고딕 폰트를 찾아 설정합니다.
+font_name = None
+# 나눔고딕 폰트의 일반적인 파일 경로 및 이름 패턴을 기반으로 탐색
+# Streamlit Cloud의 Ubuntu 환경에서 fonts-nanum 설치 시 폰트 파일 경로
+nanum_font_dirs = [
+    '/usr/share/fonts/truetype/nanum/', # 일반적인 리눅스 나눔 폰트 설치 경로
+    '/usr/local/share/fonts/', # 다른 설치 경로
+    os.path.expanduser('~/.fonts/') # 사용자 폰트 경로
+]
+
+# NanumGothic 또는 유사한 나눔 폰트를 찾습니다.
+found_nanum_font_path = None
+for font_dir in nanum_font_dirs:
+    if os.path.exists(font_dir):
+        for f in os.listdir(font_dir):
+            if 'nanumgothic' in f.lower() and f.endswith('.ttf'):
+                found_nanum_font_path = os.path.join(font_dir, f)
+                break
+        if found_nanum_font_path:
+            break
+
+if found_nanum_font_path:
+    # 폰트 매니저에 폰트 추가 및 이름 가져오기
+    fm.fontManager.addfont(found_nanum_font_path)
+    font_name = fm.FontProperties(fname=found_nanum_font_path).get_name()
+    
+    # Matplotlib의 font.family 및 font.sans-serif에 나눔 폰트 설정
     plt.rcParams['font.family'] = font_name
+    plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif'] # 나눔고딕을 sans-serif 계열의 최우선 순위로 추가
     st.info(f"Matplotlib 폰트: '{font_name}'으로 설정되었습니다.")
 else:
-    # 시스템에 적절한 한글 폰트가 없을 경우, 기본 'sans-serif' 사용 및 안내 메시지
+    # 그래도 한글 폰트를 찾지 못했다면
     plt.rcParams['font.family'] = 'sans-serif'
-    st.warning("경고: 시스템에 한글 폰트(나눔고딕, 말그은고딕 등)가 설치되어 있지 않습니다. 기본 폰트로 표시됩니다.")
-    st.warning("한글이 깨져 보일 경우, Streamlit 클라우드 배포 환경에서 폰트 설치가 필요할 수 있습니다. (예: apt.txt 파일에 'fonts-nanum' 추가)")
+    st.warning("경고: 시스템에 한글 폰트(나눔고딕 등)를 찾을 수 없습니다. 기본 폰트('sans-serif')로 표시됩니다.")
+    st.warning("한글이 깨져 보일 경우, Streamlit 클라우드 배포 환경에서 `apt.txt`에 'fonts-nanum'이 올바르게 추가되었는지 확인하고 앱을 재배포해 주세요.")
 
-# 마이너스 기호가 깨지는 것을 방지
+# 마이너스 기호가 깨지는 것을 방지 (한글 폰트 적용 후에도 깨질 수 있으므로 유지)
 plt.rcParams['axes.unicode_minus'] = False
 # --- 한글 폰트 설정 끝 ---
 
@@ -112,6 +142,9 @@ def plot_relationship(data_frame, x, y):
     # scatter=False로 설정하여 산점도를 다시 그리지 않고, 오직 회귀선만 추가합니다.
     if data_frame[x].nunique() > 2:
         sns.regplot(data=data_frame, x=x, y=y, scatter=False, color='red', line_kws={'label':"선형 회귀선"})
+        # 회귀선에 대한 범례 항목을 추가하려면 label을 명시적으로 넣어주고
+        # plt.legend() 호출 시에 scatterplot의 label도 있다면 같이 나옵니다.
+        # sns.regplot의 label은 line_kws 안에 넣어주세요.
 
     # 그래프 제목 및 축 라벨 설정
     plt.title(f"{x}과(와) {y}의 관계", fontsize=16)
@@ -119,7 +152,15 @@ def plot_relationship(data_frame, x, y):
     plt.ylabel(y, fontsize=14)
     
     # 범례 표시
-    plt.legend()
+    # 'No artists with labels found to put in legend' 경고를 방지하기 위해
+    # 범례에 표시할 요소가 있을 때만 호출하거나, 기본적으로 sns.regplot에 label을 추가합니다.
+    # 현재 코드에서는 regplot에 label이 있으므로, 이 경고는 regplot이 그려지지 않을 때 발생할 수 있습니다.
+    # 일반적으로 scatterplot에도 label을 추가하여 범례에 표시할 수 있습니다.
+    if data_frame[x].nunique() > 2: # 회귀선이 그려질 때만 범례 표시
+        plt.legend()
+    # 산점도의 범례도 필요하다면 scatterplot 호출 시 label을 추가해야 합니다.
+    # 예: sns.scatterplot(data=data_frame, x=x, y=y, alpha=0.6, label="데이터 포인트")
+
     # 그래프 레이아웃 자동 조정 (라벨이 겹치지 않도록)
     plt.tight_layout()
     # Streamlit에 Matplotlib 그래프 표시
