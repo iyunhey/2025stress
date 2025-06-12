@@ -4,5 +4,4 @@ matplotlib
 seaborn
 statsmodels
 matplotlib-prettify
-seaborn
 numpy
