@@ -1,15 +1,37 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression # scikit-learn 설치 후 정상 작동
+import json # LLM 응답을 JSON으로 파싱하기 위해 추가
+import time # 로딩 스피너를 위해 추가
 
+# --- 데이터 로드 및 모델 학습 (페이지 공통) ---
 # CSV 파일 로드
-df = pd.read_csv("stress_sj.csv", encoding="cp949")
+try:
+    # CSV 파일 경로를 main.py와 동일한 레벨로 가정
+    df = pd.read_csv("stress_sj.csv", encoding="cp949")
+except FileNotFoundError:
+    st.error("오류: 'stress_sj.csv' 파일을 찾을 수 없습니다. 파일이 앱과 같은 위치에 있는지 확인해주세요.")
+    st.stop()
+except UnicodeDecodeError:
+    st.error("오류: CSV 파일 인코딩이 CP949가 아닌 것 같습니다. 파일 인코딩을 확인해주세요.")
+    st.stop()
 
 # 예측에 사용할 입력 변수 리스트 (컬럼명이 정확히 일치해야 함)
-features = ["이상심박수", "자율신경활성도 값", "자율신경 균형도", 
-            "피로도 값", "심장안정도 값", "혈관연령", 
-            "동맥혈관탄성도", "말초혈관탄성도"]
+features = [
+    "이상심박수", "자율신경활성도 값", "자율신경 균형도",
+    "피로도 값", "심장안정도 값", "혈관연령",
+    "동맥혈관탄성도", "말초혈관탄성도"
+]
+
+# 데이터프레임 컬럼 공백 제거 (일관성을 위해)
+df.columns = df.columns.str.strip()
+
+# 예측에 필요한 모든 특성 컬럼이 데이터프레임에 있는지 확인
+missing_features = [f for f in features if f not in df.columns]
+if missing_features:
+    st.error(f"오류: 예측에 필요한 다음 컬럼이 CSV 파일에 없습니다: {', '.join(missing_features)}")
+    st.stop()
 
 # 입력 변수와 타깃 변수 분리
 X = df[features]
@@ -19,48 +41,34 @@ y_mental = df["정신스트레스 값"]
 # 선형 회귀 모델 학습
 model_physical = LinearRegression()
 model_mental = LinearRegression()
-model_physical.fit(X, y_physical)
-model_mental.fit(X, y_mental)
+
+# 데이터에 NaN 값이 있을 경우 모델 학습 전 제거
+# 결측치 처리 전략은 데이터 특성에 따라 달라질 수 있습니다 (평균, 중앙값 대체 등)
+X_clean = X.dropna()
+y_physical_clean = y_physical[X_clean.index]
+y_mental_clean = y_mental[X_clean.index]
+
+if X_clean.empty:
+    st.error("오류: 입력 데이터에 유효한 값이 없어 모델을 학습할 수 없습니다. CSV 파일의 데이터를 확인해주세요.")
+    st.stop()
+
+model_physical.fit(X_clean, y_physical_clean)
+model_mental.fit(X_clean, y_mental_clean)
 
 
-# 사용자 인터페이스: 이름 입력 및 지표 선택
-name = st.text_input("이름을 입력하세요")
+# --- 예측값을 5단계 범주로 변환하는 함수 (수정됨: 높은 스트레스 값이 '안좋음'을 의미) ---
+def categorize_stress_level(value, all_values):
+    # 스트레스 값은 높을수록 안 좋은 것으로 간주합니다.
+    # 따라서 분위수 기준을 반대로 적용하여 높은 값일수록 '매우 안좋음'에 가깝게 분류합니다.
+    p20, p40, p60, p80 = np.percentile(all_values, [20, 40, 60, 80])
 
-# 입력값을 저장할 딕셔너리
-input_vals = {}
-if name:
-    for col in features:
-        # 해당 컬럼의 최소/최대값 구하기
-        min_val = float(df[col].min())
-        max_val = float(df[col].max())
-        # 슬라이더 생성 (기본값은 최소값)
-        input_vals[col] = st.slider(f"{col}", min_val, max_val, min_val)
-
-    # 예측 수행
-    X_new = pd.DataFrame([input_vals])
-    pred_physical = model_physical.predict(X_new)[0]
-    pred_mental = model_mental.predict(X_new)[0]
-
-
-# 예측값을 5단계 범주로 변환하는 함수
-def categorize(value, all_values):
-    perc = np.percentile(all_values, [20, 40, 60, 80])
-    if value <= perc[0]:
-        return "매우 안좋음"
-    elif value <= perc[1]:
-        return "안좋음"
-    elif value <= perc[2]:
-        return "보통"
-    elif value <= perc[3]:
-        return "좋음"
-    else:
-        return "매우 좋음"
-
-if name:
-    phys_cat = categorize(pred_physical, y_physical)
-    ment_cat = categorize(pred_mental, y_mental)
-
-if name:
-    st.write(f"**{name}님의 예측 결과:**")
-    st.write(f"- 신체 스트레스 예상 평가: **{phys_cat}**")
-    st.write(f"- 정신 스트레스 예상 평가: **{ment_cat}**")
+    if value >= p80:
+        return "매우 안좋음" # 상위 20%
+    elif value >= p60:
+        return "안좋음"    # 60% ~ 80%
+    elif value >= p40:
+        return "보통"    # 40% ~ 60%
+    elif value >= p20:
+        return "좋음"     # 20% ~ 40%
+    else: # value < p20
+        return "매우 좋음" 
