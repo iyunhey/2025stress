@@ -3,64 +3,26 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.font_manager as fm # 폰트 관리를 위한 모듈 임포트
-import os # 파일 시스템 경로 확인을 위해 os 모듈 임포트
+import prettify # matplotlib-prettify 라이브러리 임포트
 
 # statsmodels는 regplot이 내부적으로 처리하므로, 여기서는 직접 사용하지 않아도 됩니다.
 # import statsmodels.api as sm 
 
 # --- 한글 폰트 설정 시작 ---
-# Matplotlib 폰트 캐시를 새로고침하여 시스템에 새로 설치된 폰트를 인식하도록 합니다.
-# apt.txt를 통해 폰트를 설치한 후 Matplotlib이 이를 즉시 인식하지 못할 때 유용합니다.
+# matplotlib-prettify 라이브러리를 사용하여 한글 폰트를 자동으로 설정합니다.
+# 이 함수는 시스템에 설치된 나눔고딕 폰트 등을 자동으로 찾아 적용합니다.
+# 내부적으로 Matplotlib 폰트 캐시를 관리하고, 폰트 경로를 탐색해 줍니다.
 try:
-    fm._load_fontmanager(try_read_cache=False) # 캐시를 읽지 않고 다시 로드하도록 강제
-    st.info("Matplotlib 폰트 매니저 캐시를 새로고침했습니다.")
+    prettify.set_font()
+    st.info("Matplotlib 폰트가 'matplotlib-prettify'를 통해 설정되었습니다.")
 except Exception as e:
-    # 캐시 새로고침 중 오류가 발생할 경우 경고 메시지를 표시합니다.
-    # 이 오류는 Matplotlib 버전이 오래되었을 때 발생할 수 있습니다.
-    st.warning(f"Matplotlib 폰트 매니저 새로고침 중 오류 발생: {e}. 사용 중인 Matplotlib 버전이 낮을 수 있습니다.")
-
-# 시스템에 설치된 한글 폰트(나눔고딕 계열)를 찾아 설정합니다.
-font_name = None
-# 시스템의 모든 폰트 경로를 가져와 나눔고딕 폰트 파일을 찾습니다.
-# 'NanumGothic'이라는 이름이 포함된 폰트 파일을 우선적으로 찾습니다.
-found_nanum_font_path = None
-for font_path_in_system in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
-    if 'nanumgothic' in os.path.basename(font_path_in_system).lower():
-        found_nanum_font_path = font_path_in_system
-        break
-    # 혹은 다른 나눔 폰트가 설치되어 있다면 다음처럼 추가 탐색할 수 있습니다.
-    # elif 'nanumbarungothic' in os.path.basename(font_path_in_system).lower():
-    #     found_nanum_font_path = font_path_in_system
-    #     break
-
-if found_nanum_font_path:
-    try:
-        # 폰트 매니저에 폰트 파일을 직접 추가합니다.
-        fm.fontManager.addfont(found_nanum_font_path)
-        
-        # 추가된 폰트의 실제 내부 이름(메타데이터)을 가져옵니다.
-        prop = fm.FontProperties(fname=found_nanum_font_path)
-        font_name_from_file = prop.get_name()
-
-        # Matplotlib의 기본 폰트 패밀리를 이 폰트 이름으로 설정합니다.
-        plt.rcParams['font.family'] = font_name_from_file
-        
-        # sans-serif 폰트 목록의 가장 앞에 추가하여 한글 폰트가 영문 폰트보다 우선적으로 사용되도록 합니다.
-        plt.rcParams['font.sans-serif'] = [font_name_from_file] + plt.rcParams['font.sans-serif'] 
-        
-        st.success(f"한글 폰트 '{font_name_from_file}'이(가) 성공적으로 설정되었습니다.")
-    except Exception as e:
-        # 폰트 파일은 찾았지만 설정 과정에서 오류가 발생한 경우
-        st.error(f"한글 폰트 설정 중 예기치 않은 오류 발생: {e}")
-        plt.rcParams['font.family'] = 'sans-serif' # 오류 시 기본 폰트
-else:
-    # 나눔고딕 폰트를 찾지 못했을 경우 경고 메시지를 표시합니다.
+    # 폰트 설정 실패 시 기본 폰트로 폴백하고 경고 메시지를 표시합니다.
     plt.rcParams['font.family'] = 'sans-serif'
-    st.warning("경고: 시스템에 한글 폰트(나눔고딕 계열)를 찾을 수 없습니다. 기본 폰트('sans-serif')로 표시됩니다.")
-    st.warning("한글이 깨져 보일 경우, Streamlit 클라우드 배포 환경에서 `apt.txt`에 'fonts-nanum'이 올바르게 추가되었는지 확인하고 앱을 재배포해 주세요. (가장 최신 코드로 업데이트 필요)")
+    plt.rcParams['axes.unicode_minus'] = False # 마이너스 기호 깨짐 방지
+    st.error(f"오류: 한글 폰트 설정에 실패했습니다. ({e}) 기본 폰트로 표시됩니다.")
+    st.warning("스트림릿 클라우드에서 한글이 깨져 보일 경우, GitHub 저장소의 `apt.txt`에 `fonts-nanum`이, `requirements.txt`에 `matplotlib-prettify`가 올바르게 추가되었는지 확인 후 재배포해 주세요.")
 
-# 마이너스 기호가 깨지는 것을 방지합니다.
+# 마이너스 기호가 깨지는 것을 방지 (prettify.set_font()에서 처리되지만, 명시적으로 유지)
 plt.rcParams['axes.unicode_minus'] = False
 # --- 한글 폰트 설정 끝 ---
 
