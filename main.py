@@ -5,16 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import prettify # matplotlib-prettify 라이브러리 임포트
 
-$ virtualenv venv
-created virtual environment CPython3.9.13.final.0-64 in 606ms
-  creator CPython3Windows(dest=C:\Users\YONSAI\Desktop\streamlit-korean-fonts\venv, clear=False, no_vcs_ignore=False, global=False)
-  seeder FromAppData(download=False, pip=bundle, setuptools=bundle, wheel=bundle, via=copy, app_data_dir=C:\Users\YONSAI\AppData\Local\pypa\virtualenv)
-    added seed packages: pip==23.1.2, setuptools==67.6.1, wheel==0.40.0
-  activators BashActivator,BatchActivator,FishActivator,NushellActivator,PowerShellActivator,PythonActivator
-$ source venv/Scripts/activate
-(venv)
-$ 
-
 # statsmodels는 regplot이 내부적으로 처리하므로, 여기서는 직접 사용하지 않아도 됩니다.
 # import statsmodels.api as sm 
 
